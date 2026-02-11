@@ -2,70 +2,314 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================
+   灯輪（Hiwa）ベータ版 — グローバルスタイル
+   ============================ */
+
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 222.2 84% 4.9%;
-        --radius: 0.5rem;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-    }
-
-    .dark {
         --background: 222.2 84% 4.9%;
         --foreground: 210 40% 98%;
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 212.7 26.8% 83.9%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
     }
-}
 
-@layer base {
     * {
-        border-color: hsl(var(--border));
+        border-color: transparent;
+    }
+
+    html {
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
 
     body {
-        background-color: hsl(var(--background));
-        color: hsl(var(--foreground));
+        background-color: #08080c;
+        color: #e2e8f0;
+        font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        overflow-x: hidden;
     }
+
+    /* カラーピッカーのスタイリング */
+    input[type="color"] {
+        -webkit-appearance: none;
+        appearance: none;
+        border: none;
+        padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 3px;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 50%;
+    }
+
+    /* スクロールバーを目立たなくする */
+    ::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+}
+
+/* ============================
+   アニメーション定義
+   ============================ */
+
+@layer utilities {
+
+    /* フェードイン */
+    .animate-fade-in {
+        animation: fadeIn 0.8s ease-out forwards;
+    }
+
+    .animate-fade-in-delay-1 {
+        opacity: 0;
+        animation: fadeIn 0.8s ease-out 0.15s forwards;
+    }
+
+    .animate-fade-in-delay-2 {
+        opacity: 0;
+        animation: fadeIn 0.8s ease-out 0.3s forwards;
+    }
+
+    .animate-fade-in-delay-3 {
+        opacity: 0;
+        animation: fadeIn 0.8s ease-out 0.45s forwards;
+    }
+
+    .animate-fade-in-delay-4 {
+        opacity: 0;
+        animation: fadeIn 0.8s ease-out 0.6s forwards;
+    }
+
+    /* 呼吸アニメーション */
+    .animate-breathing {
+        animation: breathing 3s ease-in-out infinite;
+    }
+
+    /* カーソル点滅 */
+    .animate-blink {
+        animation: blink 1s step-end infinite;
+    }
+
+    /* ドットバウンス */
+    .animate-bounce-dot {
+        animation: bounceDot 1.4s ease-in-out infinite;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes breathing {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+@keyframes bounceDot {
+
+    0%,
+    80%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.3;
+    }
+
+    40% {
+        transform: translateY(-6px);
+        opacity: 0.8;
+    }
+}
+
+/* ============================
+   Textarea 自動リサイズ支援
+   ============================ */
+textarea {
+    field-sizing: content;
+}
+
+/* ============================
+   パーティクル / 星座ビュー 追加
+   ============================ */
+
+@keyframes twinkle {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(0.8);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 4px currentColor;
+    }
+
+    50% {
+        box-shadow: 0 0 16px currentColor, 0 0 32px currentColor;
+    }
+}
+
+.animate-twinkle {
+    animation: twinkle 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ============================
+   ダイブトランジション
+   ============================ */
+
+@keyframes diveExpand {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(350);
+        opacity: 1;
+    }
+}
+
+@keyframes diveContract {
+    0% {
+        transform: scale(350);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(0);
+        opacity: 0;
+    }
+}
+
+.animate-dive-in {
+    animation: diveExpand 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-dive-out {
+    animation: diveContract 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
+}
+
+/* ============================
+   Material Dust（光の粒）
+   ============================ */
+
+@keyframes materialDust {
+    0% {
+        transform: translate(0, 0) scale(0.5);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 0.4;
+    }
+
+    80% {
+        opacity: 0.2;
+    }
+
+    100% {
+        transform: translate(var(--dust-dx, 40px), var(--dust-dy, -60px)) scale(1.2);
+        opacity: 0;
+    }
+}
+
+.animate-material-dust {
+    animation: materialDust var(--dust-duration, 20s) ease-in-out infinite;
+}
+
+/* ============================
+   リサージュ回転
+   ============================ */
+
+@keyframes lissajousRotate {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-lissajous {
+    animation: lissajousRotate 60s linear infinite;
+}
+
+/* ============================
+   HIBIKI テキスト出現
+   ============================ */
+
+@keyframes hibikiReveal {
+    0% {
+        opacity: 0;
+        filter: blur(10px);
+        transform: translateY(5px);
+    }
+
+    100% {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+    }
+}
+
+.animate-hibiki-reveal {
+    animation: hibikiReveal 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
