@@ -1,29 +1,32 @@
 /**
  * 灯輪（Hiwa）ベータ版 — Gemini API クライアント
- * 
+ *
  * - APIキーがある場合: Google Generative AI SDK経由でGemini APIを呼び出し
- * - APIキーが無い場合: モック（ダミー回答）モードで動作
+ * - APIキーが無い場合: モック（温かいミラーリング）モードで動作
+ * - リトライ: 429エラー時は指数バックオフで最大3回リトライ
  * - サイレント解析: 応答末尾の |||{JSON}||| を分離し、色彩・トーンデータを返す
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 // ============================
-// Mock Responses（ミラーリング — ユーザーの言葉をそのまま映す）
+// Mock — 温かいミラーリング
 // ============================
 
-// 語尾バリエーション
-const SUFFIXES = [
-    'のですね',
-    'ですね',
-    'なんですね',
-    'ということ、ですね',
-    'と',
+// ユーザーの言葉を包み込むように映し返す語尾
+const WARM_SUFFIXES = [
+    '、のですね',
+    '……そう、なんですね',
+    '、ということなんですね',
+    '……そう感じているのですね',
+    '、と',
 ];
 
 /**
- * ユーザーの入力を反芻して返す（モック版ミラーリング）
- * 実際のGemini APIが無い場合、簡易的にユーザーの言葉を映し返す
+ * ユーザーの入力を温かく映し返す（モック版ミラーリング）
+ *
+ * 機械的に繰り返すのではなく、受け取ったことを示す温かみのある反芻。
+ * 重い言葉もそらさずに受け止めるが、冷たく突き返さない。
  */
 function buildMockMirror(userMessage) {
     if (!userMessage || userMessage.trim().length === 0) {
@@ -31,16 +34,25 @@ function buildMockMirror(userMessage) {
     }
 
     const input = userMessage.trim();
-    // 文末の句読点を除去して語尾を付ける
-    const cleaned = input.replace(/[。！？、…]+$/g, '').trim();
-    const suffix = SUFFIXES[Math.floor(Math.random() * SUFFIXES.length)];
+    // 文末の句読点・記号を除去
+    const cleaned = input.replace(/[。！？、…\s]+$/g, '').trim();
+    const suffix = WARM_SUFFIXES[Math.floor(Math.random() * WARM_SUFFIXES.length)];
 
-    return `……${cleaned}、${suffix}。`;
+    // 短い入力はそのまま映す
+    if (cleaned.length <= 8) {
+        return `……${cleaned}${suffix}。`;
+    }
+
+    // 長い入力は核心部分を抽出して映す
+    // 句点「。」で分割して最後の文を取る（最も核心に近い）
+    const sentences = cleaned.split(/[。、]/);
+    const core = sentences[sentences.length - 1].trim() || cleaned;
+
+    return `……${core}${suffix}。`;
 }
 
 /**
- * モックモードの返答を取得（色彩データ付き）
- * ユーザーの入力をそのまま反芻する
+ * モックモードの返答を取得
  */
 function getMockResponse(modeId, userMessage = '') {
     const text = buildMockMirror(userMessage);
@@ -59,15 +71,15 @@ let genAI = null;
 let model = null;
 
 /**
- * APIキーの取得とクライアント初期化
+ * APIキーの取得
  */
 function getApiKey() {
-    // Viteの環境変数を使用
     return import.meta.env.VITE_GEMINI_API_KEY || '';
 }
 
 /**
  * Gemini モデルインスタンスの取得
+ * セーフティフィルターを緩和し、重い言葉にも対応可能にする
  */
 function getModel() {
     if (model) return model;
@@ -76,7 +88,15 @@ function getModel() {
     if (!apiKey) return null;
 
     genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash-lite',
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ],
+    });
     return model;
 }
 
@@ -89,11 +109,6 @@ export function isApiAvailable() {
 
 /**
  * サイレント解析JSONを応答テキストから分離する
- * 
- * フォーマット: テキスト|||{"color":"#HEX","tone":"..."}|||
- * 
- * @param {string} rawText - AIの生応答
- * @returns {{ text: string, colorHex: string|null, tone: string|null }}
  */
 function parseSilentAnalysis(rawText) {
     const pattern = /\|\|\|\s*(\{[^}]+\})\s*\|\|\|/;
@@ -104,7 +119,6 @@ function parseSilentAnalysis(rawText) {
     let tone = null;
 
     if (match) {
-        // JSON部分を除去してテキストを取得
         text = rawText.replace(pattern, '').trim();
         try {
             const data = JSON.parse(match[1]);
@@ -123,15 +137,37 @@ function parseSilentAnalysis(rawText) {
 }
 
 /**
+ * 指数バックオフ付きリトライでAPI呼び出し
+ */
+async function callWithRetry(chatInstance, userMessage, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const result = await chatInstance.sendMessage(userMessage);
+            return result;
+        } catch (error) {
+            const status = error?.status || error?.httpErrorCode || 0;
+            const isRetryable = status === 429 || status === 503;
+
+            if (isRetryable && attempt < maxRetries - 1) {
+                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+                console.warn(`Gemini API ${status}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
+/**
  * AIに応答を生成させる
- * 
+ *
  * @param {string} systemPrompt - buildSystemPrompt() で構築したシステムプロンプト
  * @param {string} userMessage - ユーザーの入力メッセージ
  * @param {string} modeId - モードID（モックモード時に使用）
  * @returns {Promise<{ text: string, colorHex: string|null, tone: string|null }>}
  */
 export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMOSHIBI') {
-    // APIが利用不可ならモックモード
     if (!isApiAvailable()) {
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
         return getMockResponse(modeId, userMessage);
@@ -143,15 +179,14 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
             return getMockResponse(modeId, userMessage);
         }
 
-        // 解像度同期: ユーザー入力長に基づいて応答上限を動的に決定
         const inputLen = userMessage.length;
         let maxTokens;
-        if (inputLen <= 15) maxTokens = 40;
-        else if (inputLen <= 50) maxTokens = 80;
-        else if (inputLen <= 100) maxTokens = 120;
-        else maxTokens = 150;
+        if (inputLen <= 15) maxTokens = 50;
+        else if (inputLen <= 50) maxTokens = 100;
+        else if (inputLen <= 100) maxTokens = 140;
+        else maxTokens = 180;
 
-        // サイレント解析JSON分の余裕を加算
+        // サイレント解析JSON分の余裕
         maxTokens += 60;
 
         const chat = geminiModel.startChat({
@@ -159,22 +194,21 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
             systemInstruction: systemPrompt,
             generationConfig: {
                 maxOutputTokens: maxTokens,
-                temperature: 0.8,
+                temperature: 0.75,
                 topP: 0.9,
                 topK: 40,
             },
         });
 
-        const result = await chat.sendMessage(userMessage);
+        const result = await callWithRetry(chat, userMessage);
         const response = result.response;
         const rawText = response.text().trim();
 
-        // サイレント解析JSONを分離
         const parsed = parseSilentAnalysis(rawText);
         let text = parsed.text;
 
-        // 解像度同期の安全策: ユーザー入力長に応じた上限で切り詰め
-        const maxChars = Math.max(15, Math.min(inputLen * 1.2, 100));
+        // 長さ制限
+        const maxChars = Math.max(20, Math.min(inputLen * 1.5, 120));
         if (text.length > maxChars) {
             const sentenceEnd = text.search(/[。！？\n]/);
             if (sentenceEnd > 0 && sentenceEnd <= maxChars) {
@@ -195,6 +229,7 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
         };
     } catch (error) {
         console.error('Gemini API Error:', error);
-        return getMockResponse(modeId);
+        // エラー時はモックで温かく映し返す
+        return getMockResponse(modeId, userMessage);
     }
 }
