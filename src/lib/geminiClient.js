@@ -179,15 +179,9 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
             return getMockResponse(modeId, userMessage);
         }
 
-        const inputLen = userMessage.length;
-        let maxTokens;
-        if (inputLen <= 15) maxTokens = 50;
-        else if (inputLen <= 50) maxTokens = 100;
-        else if (inputLen <= 100) maxTokens = 140;
-        else maxTokens = 180;
-
-        // サイレント解析JSON分の余裕
-        maxTokens += 60;
+        // トークン制限：プロンプト側で密度を制御するため、十分な余裕を持たせる
+        // サイレント解析JSON分(約60トークン)も含む
+        const maxTokens = 250;
 
         const chat = geminiModel.startChat({
             history: [],
@@ -205,22 +199,7 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
         const rawText = response.text().trim();
 
         const parsed = parseSilentAnalysis(rawText);
-        let text = parsed.text;
-
-        // 長さ制限
-        const maxChars = Math.max(20, Math.min(inputLen * 1.5, 120));
-        if (text.length > maxChars) {
-            const sentenceEnd = text.search(/[。！？\n]/);
-            if (sentenceEnd > 0 && sentenceEnd <= maxChars) {
-                text = text.substring(0, sentenceEnd + 1);
-            } else {
-                const cutPoint = Math.min(text.length, Math.floor(maxChars));
-                text = text.substring(0, cutPoint);
-                if (!text.endsWith('。') && !text.endsWith('…')) {
-                    text += '…';
-                }
-            }
-        }
+        const text = parsed.text;
 
         return {
             text,
