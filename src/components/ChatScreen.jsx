@@ -52,21 +52,45 @@ const ChatScreen = ({ settings, onBack }) => {
     const currentMode = MODES[settings.mode];
     const hibiki = emotionVector.hibiki;
 
-    // 背景グラデーション（ambientColorでじわ〜っと変化）
+    // モード別ウェルカムメッセージ
+    const welcomeMessages = useMemo(() => {
+        switch (settings.mode) {
+            case 'RAIMEI': return { main: '言葉にしろ。', sub: '何でもいい。ここにいる。' };
+            case 'TENBIN': return { main: '……観測を開始します。', sub: '心にあることを、入力してください。' };
+            default: return { main: '何も急がなくていい。', sub: '心にあることを、そのまま書いてみてください。' };
+        }
+    }, [settings.mode]);
+
+    // モード別の入力プレースホルダー
+    const placeholderText = useMemo(() => {
+        switch (settings.mode) {
+            case 'RAIMEI': return '吐き出せ';
+            case 'TENBIN': return '入力してください';
+            default: return 'ここに、心にあることを…';
+        }
+    }, [settings.mode]);
+
+    // 背景グラデーション（ambientColor + モードカラーでじわ〜っと変化）
     const bgStyle = useMemo(() => {
         const hex = ambientColor;
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
         const b = parseInt(hex.slice(5, 7), 16);
+        // モードカラーをRGBに
+        const mc = currentMode.color;
+        const mr = parseInt(mc.slice(1, 3), 16);
+        const mg = parseInt(mc.slice(3, 5), 16);
+        const mb = parseInt(mc.slice(5, 7), 16);
         return {
             background: `
         radial-gradient(ellipse at 30% 20%, rgba(${r},${g},${b},0.10) 0%, transparent 50%),
         radial-gradient(ellipse at 70% 80%, rgba(${r},${g},${b},0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 0%, rgba(${mr},${mg},${mb},0.04) 0%, transparent 40%),
         linear-gradient(180deg, rgba(8,8,12,1) 0%, rgba(12,12,18,1) 100%)
       `,
             transition: 'background 3s ease',
         };
-    }, [ambientColor]);
+    }, [ambientColor, currentMode.color]);
 
     // ── リサージュカーブ ──
     useEffect(() => {
@@ -206,15 +230,7 @@ const ChatScreen = ({ settings, onBack }) => {
         setIsMuted(newState);
     }, []);
 
-    // 色のRGB
-    const colorRgb = useMemo(() => {
-        const hex = settings.color;
-        return {
-            r: parseInt(hex.slice(1, 3), 16),
-            g: parseInt(hex.slice(3, 5), 16),
-            b: parseInt(hex.slice(5, 7), 16),
-        };
-    }, [settings.color]);
+
 
     // Material Dust用のランダム値
     const dustParticles = useMemo(() => {
@@ -286,11 +302,14 @@ const ChatScreen = ({ settings, onBack }) => {
                 ))}
             </div>
 
-            {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] relative z-10">
+            {/* Header — モードカラーでアクセント */}
+            <header
+                className="flex items-center justify-between px-6 py-4 relative z-10"
+                style={{ borderBottom: `1px solid ${currentMode.color}18` }}
+            >
                 <button
                     onClick={handleBack}
-                    className="flex items-center gap-2 text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+                    className="flex items-center gap-2 text-white/55 hover:text-white/90 transition-colors cursor-pointer"
                 >
                     <ArrowLeft size={16} />
                     <span className="text-xs tracking-wider">設定に戻る</span>
@@ -300,7 +319,7 @@ const ChatScreen = ({ settings, onBack }) => {
                     {/* ミュートボタン */}
                     <button
                         onClick={handleToggleMute}
-                        className="text-white/50 hover:text-white/80 transition-colors cursor-pointer p-1"
+                        className="text-white/45 hover:text-white/80 transition-colors cursor-pointer p-1"
                         title={isMuted ? '音をオンにする' : '音を消す'}
                     >
                         {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -320,16 +339,19 @@ const ChatScreen = ({ settings, onBack }) => {
                         </span>
                     </div>
 
-                    <div className="w-px h-4 bg-white/10" />
+                    <div className="w-px h-4" style={{ backgroundColor: `${currentMode.color}20` }} />
 
                     <div
                         className="w-3 h-3 rounded-full"
                         style={{
-                            backgroundColor: settings.color,
-                            boxShadow: `0 0 8px ${settings.color}60`,
+                            backgroundColor: currentMode.color,
+                            boxShadow: `0 0 8px ${currentMode.color}60`,
                         }}
                     />
-                    <span className="text-xs text-white/70 tracking-wider">
+                    <span
+                        className="text-xs tracking-wider"
+                        style={{ color: `${currentMode.color}bb` }}
+                    >
                         {currentMode.icon} {currentMode.label}
                     </span>
                     {!apiAvailable && (
@@ -343,21 +365,24 @@ const ChatScreen = ({ settings, onBack }) => {
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto px-6 py-8 relative z-10">
                 <div className="max-w-xl mx-auto space-y-6">
-                    {/* Welcome Message */}
+                    {/* Welcome Message — モード別 */}
                     {showWelcome && messages.length === 0 && (
                         <div className="text-center py-24 animate-fade-in">
                             <div
                                 className="w-16 h-16 rounded-full mx-auto mb-8 animate-breathing"
                                 style={{
-                                    backgroundColor: `rgba(${colorRgb.r},${colorRgb.g},${colorRgb.b},0.2)`,
-                                    boxShadow: `0 0 40px rgba(${colorRgb.r},${colorRgb.g},${colorRgb.b},0.15)`,
+                                    backgroundColor: `${currentMode.color}22`,
+                                    boxShadow: `0 0 50px ${currentMode.color}18`,
                                 }}
                             />
-                            <p className="text-white/70 text-sm font-light tracking-wider">
-                                何も急がなくていい。
+                            <p
+                                className="text-sm font-light tracking-wider"
+                                style={{ color: `${currentMode.color}cc` }}
+                            >
+                                {welcomeMessages.main}
                             </p>
-                            <p className="text-white/55 text-xs mt-3 font-light tracking-wider">
-                                心にあることを、そのまま書いてみてください。
+                            <p className="text-white/45 text-xs mt-3 font-light tracking-wider">
+                                {welcomeMessages.sub}
                             </p>
                             {/* HIBIKI状態 */}
                             <div className="mt-8 flex items-center justify-center gap-2">
@@ -380,7 +405,13 @@ const ChatScreen = ({ settings, onBack }) => {
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
                             {msg.role === 'user' ? (
-                                <div className="max-w-[80%] px-5 py-3 rounded-2xl rounded-br-sm bg-white/[0.08] border border-white/[0.08] text-white text-sm leading-relaxed">
+                                <div
+                                    className="max-w-[80%] px-5 py-3 rounded-2xl rounded-br-sm text-white text-sm leading-relaxed"
+                                    style={{
+                                        backgroundColor: `${currentMode.color}0a`,
+                                        border: `1px solid ${currentMode.color}15`,
+                                    }}
+                                >
                                     {msg.content}
                                 </div>
                             ) : (
@@ -418,9 +449,9 @@ const ChatScreen = ({ settings, onBack }) => {
                                     }}
                                 />
                                 <div className="flex gap-1.5">
-                                    <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce-dot" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce-dot" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce-dot" style={{ animationDelay: '300ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full animate-bounce-dot" style={{ animationDelay: '0ms', backgroundColor: `${currentMode.color}80` }} />
+                                    <span className="w-1.5 h-1.5 rounded-full animate-bounce-dot" style={{ animationDelay: '150ms', backgroundColor: `${currentMode.color}80` }} />
+                                    <span className="w-1.5 h-1.5 rounded-full animate-bounce-dot" style={{ animationDelay: '300ms', backgroundColor: `${currentMode.color}80` }} />
                                 </div>
                             </div>
                         </div>
@@ -457,8 +488,11 @@ const ChatScreen = ({ settings, onBack }) => {
                 </div>
             </div>
 
-            {/* Input Area */}
-            <div className="border-t border-white/[0.06] px-6 py-4 relative z-10">
+            {/* Input Area — モードカラーアクセント */}
+            <div
+                className="px-6 py-4 relative z-10"
+                style={{ borderTop: `1px solid ${currentMode.color}12` }}
+            >
                 <div className="max-w-xl mx-auto flex items-end gap-3">
                     <div className="flex-1 relative">
                         <textarea
@@ -466,27 +500,53 @@ const ChatScreen = ({ settings, onBack }) => {
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="ここに、心にあることを…"
+                            placeholder={placeholderText}
                             rows={1}
-                            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-white/20 transition-colors resize-none leading-relaxed"
-                            style={{ minHeight: '44px', maxHeight: '120px' }}
+                            className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/35 focus:outline-none transition-all resize-none leading-relaxed"
+                            style={{
+                                minHeight: '44px',
+                                maxHeight: '120px',
+                                backgroundColor: `${currentMode.color}08`,
+                                border: `1px solid ${currentMode.color}15`,
+                                boxShadow: inputText ? `0 0 15px ${currentMode.color}10` : 'none',
+                            }}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = `${currentMode.color}35`;
+                                e.target.style.boxShadow = `0 0 20px ${currentMode.color}15`;
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = `${currentMode.color}15`;
+                                e.target.style.boxShadow = 'none';
+                            }}
                             disabled={isLoading || isTyping}
                         />
                     </div>
                     <button
                         onClick={handleSend}
                         disabled={!inputText.trim() || isLoading || isTyping}
-                        className="flex-shrink-0 p-3 rounded-xl border border-white/[0.08] bg-white/[0.05] hover:bg-white/[0.10] disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        className="flex-shrink-0 p-3 rounded-xl disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        style={{
+                            backgroundColor: `${currentMode.color}12`,
+                            border: `1px solid ${currentMode.color}20`,
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!e.currentTarget.disabled) {
+                                e.currentTarget.style.backgroundColor = `${currentMode.color}25`;
+                                e.currentTarget.style.boxShadow = `0 0 15px ${currentMode.color}20`;
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = `${currentMode.color}12`;
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
                     >
                         {isLoading ? (
-                            <Loader2 size={18} className="text-white/80 animate-spin" />
+                            <Loader2 size={18} style={{ color: `${currentMode.color}cc` }} className="animate-spin" />
                         ) : (
-                            <Send size={18} className="text-white/80" />
+                            <Send size={18} style={{ color: `${currentMode.color}cc` }} />
                         )}
                     </button>
                 </div>
-
-
             </div>
         </div>
     );
