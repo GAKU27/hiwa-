@@ -27,6 +27,8 @@ const ChatScreen = ({ settings, onBack }) => {
     const [isMuted, setIsMuted] = useState(getMuteState());
     const [sessionSaved, setSessionSaved] = useState(false);
     const [waveformTime, setWaveformTime] = useState(0);
+    // 動的背景色（AIのサイレント解析から受け取る）
+    const [ambientColor, setAmbientColor] = useState(settings.color);
 
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -50,20 +52,21 @@ const ChatScreen = ({ settings, onBack }) => {
     const currentMode = MODES[settings.mode];
     const hibiki = emotionVector.hibiki;
 
-    // 背景グラデーション
+    // 背景グラデーション（ambientColorでじわ〜っと変化）
     const bgStyle = useMemo(() => {
-        const hex = settings.color;
+        const hex = ambientColor;
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
         const b = parseInt(hex.slice(5, 7), 16);
         return {
             background: `
-        radial-gradient(ellipse at 30% 20%, rgba(${r},${g},${b},0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 80%, rgba(${r},${g},${b},0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 30% 20%, rgba(${r},${g},${b},0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(${r},${g},${b},0.15) 0%, transparent 50%),
         linear-gradient(180deg, rgba(8,8,12,1) 0%, rgba(12,12,18,1) 100%)
       `,
+            transition: 'background 3s ease',
         };
-    }, [settings.color]);
+    }, [ambientColor]);
 
     // ── リサージュカーブ ──
     useEffect(() => {
@@ -170,15 +173,21 @@ const ChatScreen = ({ settings, onBack }) => {
             const response = await generateResponse(systemPrompt, text, settings.mode);
             setIsLoading(false);
             const aiMsgId = Date.now() + 1;
-            await typewriterEffect(response);
+
+            // サイレント解析の色で背景をじわ〜っと変化
+            if (response.colorHex) {
+                setAmbientColor(response.colorHex);
+            }
+
+            await typewriterEffect(response.text);
             playResponseBell();
-            const aiMsg = { id: aiMsgId, role: 'ai', content: response };
+            const aiMsg = { id: aiMsgId, role: 'ai', content: response.text };
             setMessages(prev => [...prev, aiMsg]);
             setDisplayedResponse('');
         } catch (error) {
             console.error('Error:', error);
             setIsLoading(false);
-            const errorMsg = { id: Date.now() + 1, role: 'ai', content: '…。' };
+            const errorMsg = { id: Date.now() + 1, role: 'ai', content: '……。' };
             setMessages(prev => [...prev, errorMsg]);
         }
     };
@@ -462,14 +471,7 @@ const ChatScreen = ({ settings, onBack }) => {
                     </button>
                 </div>
 
-                {/* Debug Info */}
-                <div className="max-w-xl mx-auto mt-2 flex justify-center">
-                    <p className="text-[9px] text-white/30 font-mono">
-                        S:{emotionVector.silenceCoeff} V:{emotionVector.vitalityCoeff} D:{emotionVector.depthCoeff}
-                        {' '}{hibiki.stage.en}:{hibiki.fas.toFixed(3)}
-                        {emotionVector.adviceBan ? ' [ADV:BAN]' : ''}
-                    </p>
-                </div>
+
             </div>
         </div>
     );

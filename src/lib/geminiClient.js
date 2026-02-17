@@ -3,61 +3,50 @@
  * 
  * - APIキーがある場合: Google Generative AI SDK経由でGemini APIを呼び出し
  * - APIキーが無い場合: モック（ダミー回答）モードで動作
+ * - サイレント解析: 応答末尾の |||{JSON}||| を分離し、色彩・トーンデータを返す
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ============================
-// Mock Responses
+// Mock Responses（ミラーリング風）
 // ============================
 
 const MOCK_RESPONSES = {
     TOMOSHIBI: [
-        '…うん、聴こえてるよ。',
-        'その重さ、ちゃんと感じてる。',
-        'ここにいるよ。',
-        '何も言わなくていい。',
-        'そのまま、でいい。',
-        '…うん。',
-        '泣いていいんだよ。',
-        'その痛み、消えなくていい。',
-        'ゆっくりでいいから。',
-        '一人じゃないよ。',
-        '息をして。それだけで大丈夫。',
-        '全部抱えなくていい。',
+        '……聴こえてるよ。',
+        '……うん。',
+        '……そのまま、でいい。',
+        '……ゆっくりでいいから。',
+        '……一人じゃないよ。',
+        '……何も言わなくていい。',
     ],
     RAIMEI: [
-        'まだ折れてない、それが答えだ。',
-        'その怒り、力だよ。',
-        'お前はまだ立ってる。',
-        '諦めてたら、ここにいない。',
-        'その拳、まだ握れるだろ。',
-        '弱さを知ってる奴が一番強い。',
-        '声にした時点で、もう戦ってる。',
-        '震えてる手で、よく書いたな。',
-        'まだ燃えてるじゃないか。',
-        'お前の中の炎、見えてるぞ。',
+        '……まだ折れてない、それが答えだ。',
+        '……その怒り、力だよ。',
+        '……まだ立ってるじゃないか。',
+        '……声にした時点で、もう戦ってる。',
+        '……まだ燃えてるじゃないか。',
     ],
     TENBIN: [
-        '怒りの奥に、悲しみがある。',
-        '逃げたいのではなく、休みたいだけ。',
-        '本当は、もう答えを持っているね。',
-        'それは恐怖ではなく、変化への抵抗。',
-        '言葉にできたなら、整理は始まっている。',
-        '疲れたのではなく、頑張りすぎた証。',
-        '迷いは、選択肢があるということ。',
-        '痛みは、まだ感じられる証拠。',
-        '混乱の中に、核心がひとつある。',
-        'その「分からない」が、正直な答え。',
+        '……言葉にできたなら、整理は始まっている。',
+        '……迷いは、選択肢があるということ。',
+        '……その「分からない」が、正直な答えですね。',
+        '……混乱の中に、核心がひとつある。',
     ],
 };
 
 /**
- * モックモードの返答を取得
+ * モックモードの返答を取得（色彩データ付き）
  */
 function getMockResponse(modeId) {
     const responses = MOCK_RESPONSES[modeId] || MOCK_RESPONSES['TOMOSHIBI'];
-    return responses[Math.floor(Math.random() * responses.length)];
+    const text = responses[Math.floor(Math.random() * responses.length)];
+    return {
+        text,
+        colorHex: null,
+        tone: null,
+    };
 }
 
 // ============================
@@ -97,17 +86,51 @@ export function isApiAvailable() {
 }
 
 /**
+ * サイレント解析JSONを応答テキストから分離する
+ * 
+ * フォーマット: テキスト|||{"color":"#HEX","tone":"..."}|||
+ * 
+ * @param {string} rawText - AIの生応答
+ * @returns {{ text: string, colorHex: string|null, tone: string|null }}
+ */
+function parseSilentAnalysis(rawText) {
+    const pattern = /\|\|\|\s*(\{[^}]+\})\s*\|\|\|/;
+    const match = rawText.match(pattern);
+
+    let text = rawText;
+    let colorHex = null;
+    let tone = null;
+
+    if (match) {
+        // JSON部分を除去してテキストを取得
+        text = rawText.replace(pattern, '').trim();
+        try {
+            const data = JSON.parse(match[1]);
+            if (data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)) {
+                colorHex = data.color;
+            }
+            if (data.tone) {
+                tone = data.tone;
+            }
+        } catch (e) {
+            console.warn('Silent analysis parse failed:', e);
+        }
+    }
+
+    return { text, colorHex, tone };
+}
+
+/**
  * AIに応答を生成させる
  * 
  * @param {string} systemPrompt - buildSystemPrompt() で構築したシステムプロンプト
  * @param {string} userMessage - ユーザーの入力メッセージ
  * @param {string} modeId - モードID（モックモード時に使用）
- * @returns {Promise<string>} AIの返答テキスト
+ * @returns {Promise<{ text: string, colorHex: string|null, tone: string|null }>}
  */
 export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMOSHIBI') {
     // APIが利用不可ならモックモード
     if (!isApiAvailable()) {
-        // 少し遅延を入れてリアルな感じにする
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
         return getMockResponse(modeId);
     }
@@ -126,6 +149,9 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
         else if (inputLen <= 100) maxTokens = 120;
         else maxTokens = 150;
 
+        // サイレント解析JSON分の余裕を加算
+        maxTokens += 60;
+
         const chat = geminiModel.startChat({
             history: [],
             systemInstruction: systemPrompt,
@@ -139,17 +165,19 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
 
         const result = await chat.sendMessage(userMessage);
         const response = result.response;
-        let text = response.text().trim();
+        const rawText = response.text().trim();
+
+        // サイレント解析JSONを分離
+        const parsed = parseSilentAnalysis(rawText);
+        let text = parsed.text;
 
         // 解像度同期の安全策: ユーザー入力長に応じた上限で切り詰め
         const maxChars = Math.max(15, Math.min(inputLen * 1.2, 100));
         if (text.length > maxChars) {
-            // 句点で区切れるなら区切る
             const sentenceEnd = text.search(/[。！？\n]/);
             if (sentenceEnd > 0 && sentenceEnd <= maxChars) {
                 text = text.substring(0, sentenceEnd + 1);
             } else {
-                // 最も近い自然な区切りで切る
                 const cutPoint = Math.min(text.length, Math.floor(maxChars));
                 text = text.substring(0, cutPoint);
                 if (!text.endsWith('。') && !text.endsWith('…')) {
@@ -158,10 +186,13 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
             }
         }
 
-        return text;
+        return {
+            text,
+            colorHex: parsed.colorHex,
+            tone: parsed.tone,
+        };
     } catch (error) {
         console.error('Gemini API Error:', error);
-        // エラー時はモックモードにフォールバック
         return getMockResponse(modeId);
     }
 }
