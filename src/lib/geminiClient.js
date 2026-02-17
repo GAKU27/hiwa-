@@ -9,39 +9,41 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ============================
-// Mock Responses（ミラーリング風）
+// Mock Responses（ミラーリング — ユーザーの言葉をそのまま映す）
 // ============================
 
-const MOCK_RESPONSES = {
-    TOMOSHIBI: [
-        '……聴こえてるよ。',
-        '……うん。',
-        '……そのまま、でいい。',
-        '……ゆっくりでいいから。',
-        '……一人じゃないよ。',
-        '……何も言わなくていい。',
-    ],
-    RAIMEI: [
-        '……まだ折れてない、それが答えだ。',
-        '……その怒り、力だよ。',
-        '……まだ立ってるじゃないか。',
-        '……声にした時点で、もう戦ってる。',
-        '……まだ燃えてるじゃないか。',
-    ],
-    TENBIN: [
-        '……言葉にできたなら、整理は始まっている。',
-        '……迷いは、選択肢があるということ。',
-        '……その「分からない」が、正直な答えですね。',
-        '……混乱の中に、核心がひとつある。',
-    ],
-};
+// 語尾バリエーション
+const SUFFIXES = [
+    'のですね',
+    'ですね',
+    'なんですね',
+    'ということ、ですね',
+    'と',
+];
+
+/**
+ * ユーザーの入力を反芻して返す（モック版ミラーリング）
+ * 実際のGemini APIが無い場合、簡易的にユーザーの言葉を映し返す
+ */
+function buildMockMirror(userMessage) {
+    if (!userMessage || userMessage.trim().length === 0) {
+        return '……。';
+    }
+
+    const input = userMessage.trim();
+    // 文末の句読点を除去して語尾を付ける
+    const cleaned = input.replace(/[。！？、…]+$/g, '').trim();
+    const suffix = SUFFIXES[Math.floor(Math.random() * SUFFIXES.length)];
+
+    return `……${cleaned}、${suffix}。`;
+}
 
 /**
  * モックモードの返答を取得（色彩データ付き）
+ * ユーザーの入力をそのまま反芻する
  */
-function getMockResponse(modeId) {
-    const responses = MOCK_RESPONSES[modeId] || MOCK_RESPONSES['TOMOSHIBI'];
-    const text = responses[Math.floor(Math.random() * responses.length)];
+function getMockResponse(modeId, userMessage = '') {
+    const text = buildMockMirror(userMessage);
     return {
         text,
         colorHex: null,
@@ -132,13 +134,13 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
     // APIが利用不可ならモックモード
     if (!isApiAvailable()) {
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-        return getMockResponse(modeId);
+        return getMockResponse(modeId, userMessage);
     }
 
     try {
         const geminiModel = getModel();
         if (!geminiModel) {
-            return getMockResponse(modeId);
+            return getMockResponse(modeId, userMessage);
         }
 
         // 解像度同期: ユーザー入力長に基づいて応答上限を動的に決定
