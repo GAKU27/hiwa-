@@ -165,9 +165,10 @@ async function callWithRetry(chatInstance, userMessage, maxRetries = 3) {
  * @param {string} systemPrompt - buildSystemPrompt() で構築したシステムプロンプト
  * @param {string} userMessage - ユーザーの入力メッセージ
  * @param {string} modeId - モードID（モックモード時に使用）
+ * @param {Array} conversationHistory - 直近の会話履歴 [{role, content}]
  * @returns {Promise<{ text: string, colorHex: string|null, tone: string|null }>}
  */
-export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMOSHIBI') {
+export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMOSHIBI', conversationHistory = []) {
     if (!isApiAvailable()) {
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
         return getMockResponse(modeId, userMessage);
@@ -183,8 +184,16 @@ export async function generateResponse(systemPrompt, userMessage, modeId = 'TOMO
         // サイレント解析JSON分(約60トークン)も含む
         const maxTokens = 250;
 
+        // 直近5往復の会話履歴をGemini chat形式に変換
+        const history = conversationHistory
+            .slice(-10) // 最大5往復 = 10メッセージ
+            .map(msg => ({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.content }],
+            }));
+
         const chat = geminiModel.startChat({
-            history: [],
+            history,
             systemInstruction: systemPrompt,
             generationConfig: {
                 maxOutputTokens: maxTokens,

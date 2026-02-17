@@ -170,7 +170,7 @@ const ChatScreen = ({ settings, onBack }) => {
         setIsLoading(true);
 
         try {
-            const response = await generateResponse(systemPrompt, text, settings.mode);
+            const response = await generateResponse(systemPrompt, text, settings.mode, messages);
             setIsLoading(false);
             const aiMsgId = Date.now() + 1;
 
@@ -373,25 +373,32 @@ const ChatScreen = ({ settings, onBack }) => {
                     )}
 
                     {/* Message List */}
-                    {messages.map((msg) => (
+                    {messages.map((msg, index) => (
                         <div
                             key={msg.id}
-                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-msg-appear`}
+                            style={{ animationDelay: `${index * 0.05}s` }}
                         >
                             {msg.role === 'user' ? (
                                 <div className="max-w-[80%] px-5 py-3 rounded-2xl rounded-br-sm bg-white/[0.08] border border-white/[0.08] text-white text-sm leading-relaxed">
                                     {msg.content}
                                 </div>
                             ) : (
-                                <div className="max-w-[80%] flex items-start gap-3">
+                                <div
+                                    className="max-w-[80%] flex items-start gap-3 pl-3 border-l-2 animate-ai-glow"
+                                    style={{
+                                        borderColor: `${currentMode.color}60`,
+                                        '--glow-color': currentMode.color,
+                                    }}
+                                >
                                     <div
                                         className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
                                         style={{
                                             backgroundColor: currentMode.color,
-                                            boxShadow: `0 0 6px ${currentMode.color}80`,
+                                            boxShadow: `0 0 8px ${currentMode.color}80`,
                                         }}
                                     />
-                                    <p className="text-white text-base md:text-lg font-light leading-relaxed tracking-wide">
+                                    <p className="text-white/95 text-base md:text-lg font-light leading-relaxed tracking-wide">
                                         {msg.content}
                                     </p>
                                 </div>
@@ -422,17 +429,25 @@ const ChatScreen = ({ settings, onBack }) => {
                     {/* Typewriter Display */}
                     {isTyping && displayedResponse && (
                         <div className="flex justify-start animate-fade-in">
-                            <div className="max-w-[80%] flex items-start gap-3">
+                            <div
+                                className="max-w-[80%] flex items-start gap-3 pl-3 border-l-2"
+                                style={{
+                                    borderColor: `${currentMode.color}60`,
+                                }}
+                            >
                                 <div
                                     className="w-2 h-2 rounded-full mt-2 flex-shrink-0 animate-breathing"
                                     style={{
                                         backgroundColor: currentMode.color,
-                                        boxShadow: `0 0 6px ${currentMode.color}80`,
+                                        boxShadow: `0 0 8px ${currentMode.color}80`,
                                     }}
                                 />
                                 <p className="text-white/95 text-base md:text-lg font-light leading-relaxed tracking-wide">
                                     {displayedResponse}
-                                    <span className="inline-block w-0.5 h-5 bg-white/70 ml-0.5 animate-blink align-middle" />
+                                    <span
+                                        className="inline-block w-0.5 h-5 ml-0.5 animate-blink align-middle"
+                                        style={{ backgroundColor: `${currentMode.color}cc` }}
+                                    />
                                 </p>
                             </div>
                         </div>

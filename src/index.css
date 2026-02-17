@@ -313,3 +313,42 @@ textarea {
 .animate-hibiki-reveal {
     animation: hibikiReveal 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
+
+/* ============================
+   メッセージアニメーション
+   ============================ */
+
+@keyframes msgAppear {
+    0% {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-msg-appear {
+    animation: msgAppear 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+/* AI メッセージのグロー */
+@keyframes aiGlow {
+
+    0%,
+    100% {
+        border-color: var(--glow-color, #fff);
+        filter: drop-shadow(0 0 0px var(--glow-color, #fff));
+    }
+
+    50% {
+        border-color: var(--glow-color, #fff);
+        filter: drop-shadow(0 0 6px var(--glow-color, #fff));
+    }
+}
+
+.animate-ai-glow {
+    animation: aiGlow 3s ease-in-out infinite;
+}
